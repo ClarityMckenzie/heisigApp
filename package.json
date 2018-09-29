@@ -1,19 +1,23 @@
 {
-"name": "heisig",
-"version": "1.0.0",
-"main": "heisig.js",
-"description": "A cat tracker, image capturer."
-}
-
-"repository": {
+	"name": "heisig",
+	"version": "1.0.0",
+	"description": "A kanji finder.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+   "engines": {
+    "node": "6.10.3",
+    "npm": "3.10.10"
+  },
+  "repository": {
     "type": "git",
     "url": "https://github.com/claritymckenzie"
+  },
+  "dependencies": {
+    "express": "4.15.3",
+    "body-parser": "1.17.2",
+    "dotenv": "5.0.1",
+    "firebase": "5.5.0"
+  }
 }
-
-"dependencies": {
-  "express": "4.15.3",
-  "body-parser": "1.17.2",
-  "dotenv": "5.0.1",
-  "firebase-tools": "3.9.1"
-
-},

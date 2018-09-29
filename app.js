@@ -1,31 +1,45 @@
-// set-up Firebase
+// set-up .env, request, Express, and enable bodyParser
 require('dotenv').config()
+const request = require('request');
+const express = require('express');
+const app = express();
+const bodyParser = require('body-parser');
+
+app.use(bodyParser.urlencoded({
+  extended: false
+}));
+app.use(bodyParser.json());
+
+// initalize Kanji Firebase
+
 var firebase = require('firebase');
 var config = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
   databaseURL: process.env.FIREBASE_URL,
 };
+
 firebase.initializeApp(config);
 var database = firebase.database();
 var ref = firebase.database().ref();
 
-// set-up request, Express, and enable bodyParser, FS too
-const request = require('request');
-const express = require('express');
-const app = express();
-const bodyParser = require('body-parser');
-app.use(bodyParser.urlencoded({
-  extended: false
-}));
-app.use(bodyParser.json());
-const fs = require('fs');
+// initialize installation Firebase
+
+var secondaryAppConfig = {
+  apiKey: process.env.API_KEY,
+  authDomain: process.env.AUTH_DOMAIN,
+  databaseURL: process.env.DATABASE_URL,
+  projectId: process.env.PROJECT_ID,
+};
+
+var secondary = firebase.initializeApp(secondaryAppConfig, "secondary");
+var secondaryDatabase = secondary.database();
 
 // NodeJS encryption with CTR
+
 var crypto = require('crypto');
 var algorithm = process.env.CRYPTO_ALGORITHM;
 var password = process.env.CRYPTO_PASSWORD;
-
 
 function encrypt(text){
   var cipher = crypto.createCipher(algorithm,password)
@@ -41,18 +55,17 @@ function decrypt(text){
   return dec;
 }
 
-// use fs to add user data to csv file, create one if it doesn't exist
+// function to add installation data
+function addEntry(userID, workspaceID, userToken) {
+  var data = {
+    user: userID,
+    workspace: workspaceID,
+    token: userToken
+  }
 
-var userDetails = {"workspaceID": "", "userID": "", "token":
-""};;
-
-function newInstallation(detailsToSave) {
-
-fs.appendFile('auth.csv', detailsToSave, () => {
-  console.log('New installation!');
-
-});
-}
+  var refTwo = secondaryDatabase.ref(process.env.REFERENCE);
+  refTwo.push(data);
+};
 
 // set-up response based on user input
 
@@ -68,7 +81,6 @@ app.post('/heisig', function(req, res) {
   if (!input) {
 
     res.send("What are we searching for?")
-
 
   } else if (input > 0 && input < 2201) {
 
@@ -111,29 +123,19 @@ app.post('/heisig', function(req, res) {
       setTimeout(function() {
 
         if (kanjiCollection[0]) {
-
           res.send(`The keyword for ${input} is: ${kanjiCollection[0]}`);
-
         } else {
-
           res.send(`I'm afraid ${input} isn't part of the Heisig list.`)
-
         }
-
-
       }, 200);
-
     })
-
 
   else {
 
     ref.orderByChild("keyword").equalTo(input).on('value', function(snapshot) {
 
       snapshot.forEach(function(childSnapshot) {
-
         var childData = childSnapshot.val();
-
         keywordCollection.push(childData.kanji);
 
       })
@@ -141,16 +143,11 @@ app.post('/heisig', function(req, res) {
       setTimeout(function() {
 
         if (keywordCollection[0]) {
-
           res.send(`The kanji for "${input}" is: ${keywordCollection[0]}`);
-
         } else {
-
           res.send(`It doesn't look like we don't have that keyword.`)
 
         }
-
-
       }, 200);
     })
   };
@@ -160,10 +157,9 @@ app.post('/heisig', function(req, res) {
 
 app.get('/authorize', function(req, res){
 
-var apiURI = 'https://slack.com/api/oauth.access?code=' + req.query.code +   "&client_id=" + process.env.CLIENT_ID + "&client_secret=" + process.env.CLIENT_SECRET + "&redirect_uri=" + process.env.REDIRECT_URI;
+  var apiURI = 'https://slack.com/api/oauth.access?code=' + req.query.code + "&client_id=" + process.env.CLIENT_ID + "&client_secret=" + process.env.CLIENT_SECRET + "&redirect_uri=" + process.env.REDIRECT_URI;
 
-request.post(apiURI, function(error, response, body){
-
+  request.post(apiURI, function(error, response, body) {
 
     if (!error && response.statusCode == 200) {
 
@@ -171,22 +167,14 @@ request.post(apiURI, function(error, response, body){
       var workspaceID = JSON.parse(body).team_id;
       var userID = JSON.parse(body).user_id;
 
-      var encryptedToken = encrypt(oauthToken)
-      var encryptedWorkspaceID = encrypt(workspaceID)
-      var encryptedUserID = encrypt(userID);
+      var encryptedToken = encrypt(String(oauthToken))
+      var encryptedWorkspaceID = encrypt(String(workspaceID))
+      var encryptedUserID = encrypt(String(userID));
 
-      userDetails.workspaceID = encryptedWorkspaceID;
-      userDetails.token = encryptedToken;
-      userDetails.userID = encryptedUserID;
-
-      var userDetailsString = JSON.stringify(userDetails)
-
-      newInstallation(userDetailsString)
+      addEntry(encryptedUserID, encryptedWorkspaceID, encryptedToken);
 
       res.redirect('https://www.hakoneprojects.com');
-
     }
-
   })
 });
 
